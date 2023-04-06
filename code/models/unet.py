@@ -13,6 +13,7 @@ class DoubleConv(nn.Module):
         super().__init__()
         if not mid_channels:
             mid_channels = out_channels
+            
         self.conv1 = nn.Sequential(
             nn.Conv2d(in_channels, mid_channels, kernel_size=3, padding=1),
             nn.BatchNorm2d(mid_channels),
@@ -100,7 +101,7 @@ class NoisePredictor(nn.Module):
         self.out_channels = out_channels
         self.bilinear = bilinear
 
-        self.architecture = [in_channels,128,256,512,1024,512,256,128,out_channels]
+        self.architecture = [in_channels,16,32,64,128,64,32,16,out_channels]
         self.inc = DoubleConv(self.architecture[0]+1, self.architecture[1])
         self.down1 = Down(self.architecture[1]+1, self.architecture[2])
         self.down2 = Down(self.architecture[2]+1, self.architecture[3])

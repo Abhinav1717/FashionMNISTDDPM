@@ -10,6 +10,7 @@ class FashionMNISTDataset(Dataset):
         self.transform = transform
         
         self.filenames = os.listdir(images_directory_path)
+        self.filenames.sort()
     def __len__(self):
         
         return len(self.filenames)
@@ -19,6 +20,7 @@ class FashionMNISTDataset(Dataset):
         file_name = self.filenames[index]
         image_path = os.path.join(self.images_directory_path,file_name)
         image = Image.open(image_path)
+        # image = image.convert("RGB")
         sample = image
         if self.transform:
             sample = self.transform(sample)

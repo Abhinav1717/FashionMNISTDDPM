@@ -14,5 +14,5 @@ In this project, we build an Ensemble of Expert Denoisers for Image generation u
 <br>
 <figure>
 <img src="Images/Ensemble.png" alt="Trulli" style="width:100%">
-<figcaption align = "center"><b>Fig.2 - Images generated with Ensemble of Experts </b></figcaption>
+<figcaption align = "center"><b>Fig.3 - Images generated with Enfusion: Ensemble of Experts </b></figcaption>
 </figure>

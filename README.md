@@ -6,12 +6,12 @@ In this project, we build an Ensemble of Expert Denoisers for Image generation u
 <img src="Images/AML_1.png" alt="Trulli" style="width:100%">
 <figcaption align = "center"><b>Fig.1 - Abstract view of Ensemble of Expert Denoisers </b></figcaption>
 </figure>
-
+<br>
 <figure>
 <img src="Images/vanilla.png" alt="Trulli" style="width:100%">
 <figcaption align = "center"><b>Fig.2 - Images generated with vanilla diffusion process </b></figcaption>
 </figure>
-
+<br>
 <figure>
 <img src="Images/Ensemble.png" alt="Trulli" style="width:100%">
 <figcaption align = "center"><b>Fig.2 - Images generated with Ensemble of Experts </b></figcaption>

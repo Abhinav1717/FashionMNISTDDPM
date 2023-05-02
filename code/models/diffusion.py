@@ -1,9 +1,11 @@
 import torch
 import torch.nn as nn
+from torchvision.utils import make_grid
 import math
 import sys
 import os
-
+import matplotlib.pyplot as plt
+import multiprocessing
 sys.path.append('./')
 
 from models.unet_new import MyUNet
@@ -12,12 +14,16 @@ from torch.optim import Adam
 
 device = None
 class DiffusionModel(nn.Module):
-    def __init__(self, input_shape=(1,28,28), timesteps=200, lbeta=1e-4, ubeta=2e-2):
+    def __init__(self, input_shape=(1,28,28), timesteps=1000, lbeta=1e-4, ubeta=2e-2):
         super().__init__()
             
         global device
         device = torch.device(os.getenv('device'))
-        self.models = [MyUNet() for _ in range(3)]
+        # self.models = [MyUNet() for _ in range(3)]
+        self.model1 = MyUNet()
+        self.model2 = MyUNet()
+        self.model3 = MyUNet()
+        self.models = [self.model1,self.model2,self.model3]
         self.models = [model.to(device) for model in self.models]
         self.timesteps = timesteps
         self.input_shape = input_shape
@@ -112,7 +118,7 @@ class DiffusionModel(nn.Module):
                 
         with torch.no_grad():
             x = x.type(torch.float32)
-            epsilon_predicted = self.forward(x,t, idx)
+            epsilon_predicted = self.forward(x, t, idx)
             ep_coefficient = self.betas[t]/torch.sqrt(1-self.alpha_bars[t])
             
             x = x - ep_coefficient.reshape(ep_coefficient.shape[0],1,1,1)*epsilon_predicted
@@ -126,8 +132,17 @@ class DiffusionModel(nn.Module):
         return x
 
     def train_model(self,train_loader,n_iterations,learning_rate,writer,model_path, levels=4):    
-        
+        epoch_list = []
+        for l in range(1, levels+1):
+            epoch_list.append(max(n_iterations//3, n_iterations//l))
+        print(epoch_list)
         optimizers = [Adam(self.models[i].parameters(),learning_rate) for i in range(3)]
+        # optimizers[1] = None
+        # optimizers[2] = None
+        # self.models[1] = None
+        # self.models[2] = None
+        iteration_no = 0
+        
         for l in tqdm(range(levels)):
             curr_bound = self.timesteps // 2**l
             self._range = None
@@ -140,12 +155,14 @@ class DiffusionModel(nn.Module):
                         (curr_bound, self.timesteps - curr_bound), 
                         (self.timesteps - curr_bound, self.timesteps)]
             range_count = [max(0, cb[1] - cb[0]) for cb in self._range]
-            iteration_no = 0
-            epochs = n_iterations // 2**l
+            
+            # print(self._range)
+            epochs = epoch_list[l]
+
             for epoch in tqdm(range(epochs),leave=False):
                 
                 for batch in tqdm(train_loader):
-                    writer.add_image('input_image', batch[0], iteration_no)
+                    writer.add_image('input_image', batch[0]/2 + 0.5, iteration_no)
                     batch = batch.to(device)
                     batch_size = batch.shape[0]
                     
@@ -166,6 +183,7 @@ class DiffusionModel(nn.Module):
                     xt = xt.type(torch.float32)
                     
                     for optim in optimizers:
+                        # if optim is not None:
                         optim.zero_grad()
                     
                     epsilon_predicted = self.forward(xt, t, sampled_idx)
@@ -177,25 +195,29 @@ class DiffusionModel(nn.Module):
                     
                     writer.add_scalar("Loss",loss.item(),iteration_no)
                 
-                    iteration_no+=1    
+                    iteration_no+=1                        
                 
+            #     if (epoch+1)%10 == 0:
+            #         generated_images = self.sample(10)
+            #         for i in range(len(generated_images)):
+            #             generated_images[i]-=torch.min(generated_images[i])
+            #             generated_images[i]/=(torch.max(generated_images[i])-torch.min(generated_images[i]))
+            #         writer.add_image("Generated_Images",generated_images[0],iteration_no)
+            #         writer.add_image("Generated_Images_2",generated_images[1],iteration_no)
+            #         writer.add_image("Generated_Images_3",generated_images[2],iteration_no)
+            #         writer.add_image("Generated_Images_4",generated_images[3],iteration_no)
+            #         writer.add_image("Generated_Images_5",generated_images[4],iteration_no)
+            #         writer.add_image("Generated_Images_6",generated_images[5],iteration_no)
+            #         writer.add_image("Generated_Images_7",generated_images[6],iteration_no)
+            #         writer.add_image("Generated_Images_8",generated_images[7],iteration_no)
+            #         writer.add_image("Generated_Images_9",generated_images[8],iteration_no)
+            #         writer.add_image("Generated_Images_10",generated_images[9],iteration_no)
                 if epoch%10 == 0:
-                    generated_images = self.sample(10)
-                    writer.add_image("Generated_Images",generated_images[0],iteration_no)
-                    writer.add_image("Generated_Images_2",generated_images[1],iteration_no)
-                    writer.add_image("Generated_Images_3",generated_images[2],iteration_no)
-                    writer.add_image("Generated_Images_4",generated_images[3],iteration_no)
-                    writer.add_image("Generated_Images_5",generated_images[4],iteration_no)
-                    writer.add_image("Generated_Images_6",generated_images[5],iteration_no)
-                    writer.add_image("Generated_Images_7",generated_images[6],iteration_no)
-                    writer.add_image("Generated_Images_8",generated_images[7],iteration_no)
-                    writer.add_image("Generated_Images_9",generated_images[8],iteration_no)
-                    writer.add_image("Generated_Images_10",generated_images[9],iteration_no)
-                if epoch%100 == 0:
                     torch.save(self.state_dict(),model_path)
-            if l == 0:
-                for i in range(1,3):
-                    self.models[i].load_state_dict(self.models[0].state_dict())
+                
+            # if l == 0:
+            #     for i in range(1,3):
+            #         self.models[i].load_state_dict(self.models[0].state_dict())
                 
 
     def sample(self, n_samples, progress=False, return_intermediate=False):
@@ -208,10 +230,11 @@ class DiffusionModel(nn.Module):
         xt = xt.to(device)
         xt = xt.type(torch.float32)
         
-        for t in reversed(range(self.timesteps)):
+        for t in tqdm(reversed(range(self.timesteps)),leave=False):
             t = torch.Tensor([t]).repeat(n_samples).to(device).type(torch.int64)
             idx = None    
             for i, tup in enumerate(self._range):
+                # print(tup[0], tup[1])
                 if t[0] in range(tup[0], tup[1]):
                     idx = i
                     break
@@ -223,7 +246,154 @@ class DiffusionModel(nn.Module):
             return xt,intermediate_results
         else:
             return xt
+    
+    def minMaxScale(self,batch):
+        for i in range(len(batch)):
+            batch[i]-=torch.min(batch[i])
+            batch[i]/=(torch.max(batch[i])-torch.min(batch[i]))
+            
+        return batch
+    
+    def inference(self,batch_size,n_samples,levels,log_writer):
+        
+        curr_bound = self.timesteps // 2**(levels-1)
+        self._range = [(0, curr_bound), 
+                        (curr_bound, self.timesteps - curr_bound), 
+                        (self.timesteps - curr_bound, self.timesteps)]
+        n_steps = n_samples//batch_size
+        generated_images = []
+        for step in tqdm(range(n_steps)):
+            _,generated_batch_intermediate = self.sample(batch_size,False,True)
+            generated_batch_intermediate.reverse()
+            model2_output = make_grid(self.minMaxScale(generated_batch_intermediate[self.timesteps - curr_bound]),10)
+            model1_output = make_grid(self.minMaxScale(generated_batch_intermediate[curr_bound]),10)
+            model0_output = make_grid(self.minMaxScale(generated_batch_intermediate[0]),10)
+            
+            log_writer.add_image("Model_2_Output",model2_output,step)
+            log_writer.add_image("Model_1_Output",model1_output,step)
+            log_writer.add_image("Model_0_Output",model0_output,step)
+            
+            generated_images.append(self.minMaxScale(generated_batch_intermediate[0]))
+        
+        return generated_images
+    
+    def model2_processing(self,in_conn,n_steps,batch_size):
+        
+        global device
+        device = torch.device(os.getenv('device'))
+        for step in range(n_steps):
+            intermediate_results = []
+            xt = torch.zeros(batch_size,self.input_shape[0],self.input_shape[1],self.input_shape[2])
+            for i in range(batch_size):
+                xt[i] = torch.randn((self.input_shape[1],self.input_shape[2]))
+            
+            xt = xt.to(device)
+            xt = xt.type(torch.float32)
+            
+            for t in reversed(range(self._range[2][0],self._range[2][1])):
+                t = torch.Tensor([t]).repeat(batch_size).to(device).type(torch.int64)
+                idx = 2    
+                xt = self.p_sample(xt,t, idx)
+                intermediate_results.append(xt)
+            
+            in_conn.send({'xt':xt,'intermediate_results':intermediate_results,'step':step,'close':False})
+        
+        in_conn.send({'close':True})
+        in_conn.close()
 
+    def model1_processing(self,out_conn,in_conn,batch_size):
+        
+        global device
+        device = torch.device(os.getenv('device'))
+        while 1:
+            msg = out_conn.recv()
+            if msg['close'] == True:
+                break
+            
+            xt = msg['xt'].clone()
+            intermediate_results = msg['intermediate_results']
+            step = msg['step']
+            
+            print(step)
+            
+            for t in reversed(range(self._range[1][0],self._range[1][1])):
+                t = torch.Tensor([t]).repeat(batch_size).to(device).type(torch.int64)
+                idx = 1   
+                xt = self.p_sample(xt,t, idx)
+                intermediate_results.append(xt)
+                
+            in_conn.send({'xt':xt,'intermediate_results':intermediate_results,'step':step,'close':False})
+
+        in_conn.send({'close':True})
+        in_conn.close()
+        out_conn.close()
+            
+    def model0_processing(self,out_conn,log_writer,return_values,batch_size,curr_bound):
+        
+        global device
+        device = torch.device(os.getenv('device'))
+        generated_images = []
+        while 1:
+            msg = out_conn.recv()
+            if msg['close'] == True:
+                break
+            
+            xt = msg['xt'].clone()
+            intermediate_results = msg['intermediate_results']
+            step = msg['step']
+            
+            for t in reversed(range(self._range[0][0],self._range[0][1])):
+                t = torch.Tensor([t]).repeat(batch_size).to(device).type(torch.int64)
+                idx = 0   
+                xt = self.p_sample(xt,t, idx)
+                intermediate_results.append(xt)
+            
+            intermediate_results.reverse()
+            model2_output = make_grid(self.minMaxScale(intermediate_results[self.timesteps - curr_bound]),10)
+            model1_output = make_grid(self.minMaxScale(intermediate_results[curr_bound]),10)
+            model0_output = make_grid(self.minMaxScale(intermediate_results[0]),10)
+            
+            log_writer.add_image("Model_2_Output",model2_output,step)
+            log_writer.add_image("Model_1_Output",model1_output,step)
+            log_writer.add_image("Model_0_Output",model0_output,step)
+            
+            generated_images.append(self.minMaxScale(intermediate_results[0]))
+
+        out_conn.close()
+        return_values['generated_images':generated_images]
+    
+    def pipelined_inference(self,batch_size,n_samples,levels,log_writer):
+        
+        curr_bound = self.timesteps // 2**(levels-1)
+        self._range = [(0, curr_bound), 
+                        (curr_bound, self.timesteps - curr_bound), 
+                        (self.timesteps - curr_bound, self.timesteps)]
+        n_steps = n_samples//batch_size
+        
+        multiprocessing.set_start_method('spawn')
+        
+        pipe1_in,pipe1_out = multiprocessing.Pipe()
+        pipe2_in,pipe2_out = multiprocessing.Pipe()
+        
+        manager = multiprocessing.Manager()
+        return_values = manager.dict()
+        
+        model2_process = multiprocessing.Process(target=self.model2_processing,args = (pipe1_in,n_steps,batch_size))
+        model1_process = multiprocessing.Process(target=self.model1_processing,args = (pipe1_out,pipe2_in,batch_size))
+        model0_process = multiprocessing.Process(target=self.model0_processing,args = (pipe2_out,log_writer,return_values,batch_size,curr_bound))
+        
+        model2_process.start()
+        model1_process.start()
+        model0_process.start()
+        
+        model2_process.join()
+        model1_process.join()
+        model0_process.join()
+        
+        return return_values['generated_images']
+                    
+        
+        
     def get_angles(self,pos, i, d_model):
         angle_rates = 1 / torch.pow(10000, (2 * torch.div(i,2,rounding_mode='floor')) / torch.tensor(d_model, dtype=torch.float32))
         return pos * angle_rates

@@ -22,9 +22,9 @@ def main():
     # Parsing the arguements
     parser = argparse.ArgumentParser()
     
-    parser.add_argument("--batch_size",default=128,help="Size of Batch")
+    parser.add_argument("--batch_size",default=64,help="Size of Batch")
     parser.add_argument("--learning_rate",default=0.001,help="Learning Rate to train the model")
-    parser.add_argument("--n_iterations",default=100,help="No of Epochs")
+    parser.add_argument("--n_iterations",default=300,help="No of Epochs")
     parser.add_argument("--images_directory_path",default="../../datasets/FashionMNIST/train",help="Relative Path to the images directory")
     parser.add_argument("--gpu_no",default="1",help="GPU Id of the gpu you want to use for training")
     parser.add_argument("--use_cpu_only",default=False,help="Toggle if you want to use cpu for training",type=bool)
@@ -55,7 +55,7 @@ def main():
         [
             toTensor(), 
             # Resize((128,128)),
-            # Normalize()
+            Normalize()
         ]
     )
     

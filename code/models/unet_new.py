@@ -112,6 +112,7 @@ class MyUNet(nn.Module):
 
     def forward(self, x, t):
         # x is (N, 2, 28, 28) (image with positional embedding stacked on channel dimension)
+        # try:
         t = self.time_embed(t)
         n = len(x)
         out1 = self.b1(x + self.te1(t).reshape(n, -1, 1, 1))  # (N, 10, 28, 28)
@@ -130,8 +131,12 @@ class MyUNet(nn.Module):
         out = self.b_out(out + self.te_out(t).reshape(n, -1, 1, 1))  # (N, 1, 28, 28)
 
         out = self.conv_out(out)
-
+        # except:
+        #     print(t)
+        #     print("lol abhinav the god")
         return out
+
+        # return None
 
     def _make_te(self, dim_in, dim_out):
         return nn.Sequential(

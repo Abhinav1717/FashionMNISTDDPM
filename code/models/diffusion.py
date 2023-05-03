@@ -132,10 +132,10 @@ class DiffusionModel(nn.Module):
         return x
 
     def train_model(self,train_loader,n_iterations,learning_rate,writer,model_path, levels=4):    
-        epoch_list = []
-        for l in range(1, levels+1):
-            epoch_list.append(max(n_iterations//3, n_iterations//l))
-        print(epoch_list)
+        # epoch_list = []
+        # for l in range(1, levels+1):
+        #     epoch_list.append(max(n_iterations//3, n_iterations//l))
+        # print(epoch_list)
         optimizers = [Adam(self.models[i].parameters(),learning_rate) for i in range(3)]
         # optimizers[1] = None
         # optimizers[2] = None
@@ -157,7 +157,7 @@ class DiffusionModel(nn.Module):
             range_count = [max(0, cb[1] - cb[0]) for cb in self._range]
             
             # print(self._range)
-            epochs = epoch_list[l]
+            epochs = n_iterations // 2**l
 
             for epoch in tqdm(range(epochs),leave=False):
                 
